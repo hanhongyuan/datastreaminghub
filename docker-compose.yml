@@ -32,7 +32,7 @@ services:
     env_file:
       - ./hadoop.env
     ports:
-      - 50070:50070
+      - "50070:50070"
   datanode:
     image: bde2020/hadoop-datanode:1.1.0-hadoop2.8-java8
     depends_on: 
@@ -42,7 +42,7 @@ services:
     env_file:
       - ./hadoop.env
     ports:
-      - 50075:50075
+      - "50075:50075"
   spark-master:
     image: jupyter/pyspark-notebook
     container_name: spark-master
@@ -54,17 +54,17 @@ services:
     ports:
       - 4040
       - 6066
-      - 7001
       - 7002
       - 7003
       - 7004
       - 7005
       - 7006
-      - 7077
-      - 8080:8080
+      - "7077:7077"
+      - "8080:8080"
     env_file:
       - ./hadoop.env
     volumes:
+     - ./conf/master:/conf
      - ./spark:/home/jovyan/work
      - ./mydata:/home/jovyan/work/data
     links:
@@ -74,6 +74,8 @@ services:
     image: jupyter/pyspark-notebook
     command: /usr/local/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     depends_on:
+      - spark-master
+    links:
       - spark-master
     environment:
       - SPARK_MASTER=spark://spark-master:7077
@@ -88,28 +90,35 @@ services:
       - 7014
       - 7015
       - 7016
-      - 8081:8081
+      - "8081:8081"
     env_file:
       - ./hadoop.env
     volumes:
-     - ./spark:/home/jovyan/work
-     - ./mydata:/home/jovyan/work/data
-  spark-notebook:
-    image: jupyter/pyspark-notebook
-    command: /usr/local/spark/bin/spark-class org.apache.spark.deploy.master.Master -h spark-master
-    container_name: spark-notebook
-    env_file:
-      - ./hadoop.env
-    environment:
-      - SPARK_OPTS= '--master=spark://spark-master:7077'
-    ports:
-      - 8888:8888
-    volumes:
-     - ./spark:/home/jovyan/work
-     - ./mydata:/home/jovyan/work/data
+      - ./conf/worker:/conf
+      - ./spark:/home/jovyan/work
+      - ./mydata:/home/jovyan/work/data
+
+  notebook:
+    image: jupyter/all-spark-notebook
+    hostname: jupyter
+    depends_on:
+      - spark-master
+      - cassandra
+      - kafka
     links:
-     - kafka
-     - cassandra
+      - spark-master
+      - kafka
+      - cassandra
+    environment:
+      SPARK_OPTS: '--master=spark://spark-master:7077'
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./spark:/home/jovyan/work
+      - ./mydata:/home/jovyan/work/data
+    command: "start-notebook.sh --NotebookApp.token=''"
+
+
   hue:
     image: bde2020/hdfs-filebrowser:3.11
     ports:
